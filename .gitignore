@@ -35,3 +35,7 @@ Thumbs.db
 **/dist/
 !/package.json
 !/package-lock.json
+
+# Temporary files
+**/.tmp/
+backend/audit-diagnostic.ts
