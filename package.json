@@ -1,0 +1,29 @@
+{
+  "name": "balancevault",
+  "version": "1.0.0",
+  "description": "BalanceVault: Production-grade double-entry banking system with strict money conservation, idempotency, and concurrency safety.",
+  "scripts": {
+    "start:backend": "npm --prefix backend start",
+    "dev:backend": "npm --prefix backend run dev",
+    "dev:frontend": "npm --prefix frontend run dev",
+    "build:backend": "npm --prefix backend run build",
+    "build:frontend": "npm --prefix frontend run build",
+    "build": "npm run build:backend && npm run build:frontend",
+    "test": "npm --prefix backend test",
+    "seed:admin": "npm --prefix backend run seed:admin",
+    "db:harden": "npm --prefix backend run db:harden"
+  },
+  "keywords": [
+    "banking",
+    "fintech",
+    "double-entry",
+    "ledger",
+    "postgresql",
+    "prisma",
+    "idempotency",
+    "concurrency",
+    "react"
+  ],
+  "author": "BalanceVault Team",
+  "license": "ISC"
+}

@@ -1,0 +1,219 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+enum UserRole {
+  CUSTOMER
+  ADMIN
+  AUDITOR
+}
+
+enum AccountType {
+  CHECKING
+  SAVINGS
+  SYSTEM_RESERVE
+}
+
+enum AccountStatus {
+  ACTIVE
+  FROZEN
+  CLOSED
+}
+
+enum JournalEntryType {
+  DEPOSIT
+  WITHDRAWAL
+  TRANSFER
+  SYSTEM_ADJUSTMENT
+}
+
+enum JournalStatus {
+  POSTED
+  REJECTED
+}
+
+enum PostingDirection {
+  DEBIT
+  CREDIT
+}
+
+enum IdempotencyStatus {
+  IN_PROGRESS
+  COMPLETED
+  FAILED
+}
+
+enum ApplicationStatus {
+  PENDING_APPROVAL
+  APPROVED
+  REJECTED
+}
+
+enum NotificationType {
+  TRANSACTION_DEPOSIT
+  TRANSACTION_WITHDRAWAL
+  TRANSACTION_TRANSFER
+  ACCOUNT_APPLICATION_SUBMITTED
+  ACCOUNT_APPLICATION_APPROVED
+  ACCOUNT_APPLICATION_REJECTED
+  ADMIN_NEW_APPLICATION
+  SECURITY_EVENT
+  GENERAL
+}
+
+model User {
+  id                   String               @id @default(uuid())
+  email                String               @unique
+  passwordHash         String
+  fullName             String
+  role                 UserRole             @default(CUSTOMER)
+  isActive             Boolean              @default(true)
+  createdAt            DateTime             @default(now())
+  updatedAt            DateTime             @updatedAt
+  accounts             Account[]
+  idempotencyRecords   IdempotencyRecord[]
+  auditLogs            AuditLedger[]
+  applications         AccountApplication[]
+  reviewedApplications AccountApplication[] @relation("ApplicationReviewer")
+  notifications        Notification[]
+
+  @@index([email])
+  @@index([role])
+}
+
+model Account {
+  id            String              @id @default(uuid())
+  accountNumber String              @unique
+  userId        String
+  user          User                @relation(fields: [userId], references: [id], onDelete: Restrict)
+  accountType   AccountType         @default(CHECKING)
+  currency      String              @default("INR")
+  status        AccountStatus       @default(ACTIVE)
+  balance       Decimal             @default(0.0000) @db.Decimal(18, 4)
+  version       Int                 @default(0)
+  createdAt     DateTime            @default(now())
+  updatedAt     DateTime            @updatedAt
+  postings      Posting[]
+  application   AccountApplication?
+
+  @@index([accountNumber])
+  @@index([userId])
+  @@index([status])
+}
+
+model AccountApplication {
+  id              String            @id @default(uuid())
+  userId          String
+  user            User              @relation(fields: [userId], references: [id], onDelete: Restrict)
+  accountType     AccountType
+  currency        String            @default("INR")
+  status          ApplicationStatus @default(PENDING_APPROVAL)
+  rejectionReason String?
+  reviewedById    String?
+  reviewedBy      User?             @relation("ApplicationReviewer", fields: [reviewedById], references: [id])
+  reviewedAt      DateTime?
+  accountId       String?           @unique
+  account         Account?          @relation(fields: [accountId], references: [id])
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+
+  @@index([userId])
+  @@index([status])
+}
+
+model Notification {
+  id                String           @id @default(uuid())
+  userId            String
+  user              User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type              NotificationType
+  title             String
+  message           String
+  isRead            Boolean          @default(false)
+  isDismissed       Boolean          @default(false)
+  relatedEntityId   String?
+  relatedEntityType String?
+  createdAt         DateTime         @default(now())
+
+  @@index([userId])
+  @@index([userId, isRead])
+  @@index([createdAt])
+}
+
+model JournalEntry {
+  id             String           @id @default(uuid())
+  reference      String           @unique
+  entryType      JournalEntryType
+  description    String
+  idempotencyKey String?          @unique
+  status         JournalStatus    @default(POSTED)
+  amount         Decimal          @db.Decimal(18, 4)
+  metadata       Json?
+  postedAt       DateTime         @default(now())
+  createdAt      DateTime         @default(now())
+  postings       Posting[]
+
+  @@index([reference])
+  @@index([entryType])
+  @@index([postedAt])
+  @@index([idempotencyKey])
+}
+
+model Posting {
+  id             String           @id @default(uuid())
+  journalEntryId String
+  journalEntry   JournalEntry     @relation(fields: [journalEntryId], references: [id], onDelete: Restrict)
+  accountId      String
+  account        Account          @relation(fields: [accountId], references: [id], onDelete: Restrict)
+  direction      PostingDirection
+  amount         Decimal          @db.Decimal(18, 4)
+  signedAmount   Decimal          @db.Decimal(18, 4)
+  balanceAfter   Decimal          @db.Decimal(18, 4)
+  sequenceNumber Int
+  createdAt      DateTime         @default(now())
+
+  @@index([journalEntryId])
+  @@index([accountId])
+  @@index([createdAt])
+}
+
+model IdempotencyRecord {
+  id           String            @id @default(uuid())
+  key          String            @unique
+  userId       String?
+  user         User?             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  endpoint     String
+  requestHash  String
+  status       IdempotencyStatus @default(IN_PROGRESS)
+  statusCode   Int?
+  responseBody Json?
+  createdAt    DateTime          @default(now())
+  expiresAt    DateTime
+
+  @@index([key])
+  @@index([expiresAt])
+}
+
+model AuditLedger {
+  id          String   @id @default(uuid())
+  action      String
+  entityType  String
+  entityId    String
+  actorId     String?
+  actor       User?    @relation(fields: [actorId], references: [id], onDelete: SetNull)
+  actorRole   String?
+  ipAddress   String?
+  userAgent   String?
+  payload     Json?
+  prevHash    String?
+  currentHash String?
+  createdAt   DateTime @default(now())
+
+  @@index([entityType, entityId])
+  @@index([actorId])
+  @@index([createdAt])
+}
