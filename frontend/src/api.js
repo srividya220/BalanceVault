@@ -1,7 +1,7 @@
-﻿import axios from 'axios';
+import axios from 'axios';
 
 const api = axios.create({
-  baseURL: '/api',
+  baseURL: 'https://balancevault-backend-jryb.onrender.com/api',
   headers: {
     'Content-Type': 'application/json',
   },
@@ -30,3 +30,4 @@ api.interceptors.response.use(
 );
 
 export default api;
+
